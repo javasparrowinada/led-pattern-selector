@@ -51,7 +51,16 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
 .stage{background:radial-gradient(600px 300px at 50% 40%,#11151d,#06080c);
   border:1px solid var(--line);border-radius:18px;
   padding:30px 24px;text-align:center}
-.bar-shell{display:flex;justify-content:center;align-items:center;height:96px}
+.bar-shell{display:flex;justify-content:center;align-items:center;gap:20px;height:96px}
+/* status LED (round) — bar と同じ色/パターンで連動点灯 */
+.status-led{position:relative;width:17px;height:17px;border-radius:50%;flex:none;
+  background:#05070a;border:1px solid rgba(255,255,255,.12);
+  transition:background .35s,box-shadow .35s,opacity .15s}
+.status-led::after{content:"";position:absolute;inset:0;border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.04));
+  mix-blend-mode:overlay;pointer-events:none}
+.status-led::before{content:"";position:absolute;inset:0;border-radius:50%;
+  box-shadow:inset 0 0 5px rgba(0,0,0,.5);pointer-events:none}
 .led-bar{position:relative;width:100%;max-width:420px;height:46px;border-radius:12px;
   background:#05070a;border:1px solid rgba(255,255,255,.10);overflow:hidden;
   transition:background .35s,box-shadow .35s,opacity .15s}
@@ -64,6 +73,7 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
 .pat-steady{animation:none}
 .pat-slow{animation:breath 3.4s ease-in-out infinite}
 .pat-fast{animation:blink .5s steps(1,start) infinite}
+.pat-off{animation:none}
 @keyframes blink{0%,49.9%{opacity:1}50%,100%{opacity:.13}}
 @keyframes breath{0%,100%{opacity:.18}50%{opacity:1}}
 
@@ -87,6 +97,12 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
 .opt small{display:block;color:var(--txt3);font-size:10.5px;margin-top:3px;font-weight:400}
 .opt.active small{color:#bcd6f5}
 
+/* section sub-heading (バーLED / ステータスLED の区切り) */
+.sect{font-size:12.5px;font-weight:700;color:var(--txt);letter-spacing:.04em;
+  margin:24px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px}
+.sect .ic{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+
 /* color swatch opts */
 .opt.color{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0;flex:1}
 .opt.color .dot{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.2)}
@@ -98,6 +114,7 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
 .opt.pat.active .pdot{background:var(--accent)}
 .pdot.d-slow{animation:breath 3.4s ease-in-out infinite}
 .pdot.d-fast{animation:blink .5s steps(1,start) infinite}
+.pdot.d-off{background:transparent;border:1.5px solid #5e687a}
 
 .foot{margin-top:30px;font-size:11px;color:var(--txt3);line-height:1.7;
   border-top:1px solid var(--line);padding-top:16px}
@@ -137,6 +154,7 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
   <!-- LED preview -->
   <div class="stage">
     <div class="bar-shell">
+      <div class="status-led pat-steady" id="statusLed"></div>
       <div class="led-bar pat-steady" id="bar"></div>
     </div>
     <div class="readout" id="readout"></div>
@@ -146,7 +164,7 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
   <div class="group" style="margin-top:18px">
     <div class="lab">セーブ（条件 → パターン）</div>
     <button class="saveBtn" id="saveBtn">現在のパターンを保存</button>
-    <div class="save-hint">いまの条件・色・パターンを最大18枠まで保存できます（行クリックでその設定に復元）</div>
+    <div class="save-hint">いまの条件・バーLED・ステータスLEDをまとめて最大18枠まで保存（行クリックで復元）</div>
     <div class="save-list" id="saveList"></div>
   </div>
   </div>
@@ -163,14 +181,26 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
     <div class="opts" id="smellOpts"></div>
   </div>
 
+  <!-- 横棒バーLED -->
+  <div class="sect"><span class="ic"></span>横棒バーLED</div>
   <div class="group">
     <div class="lab">点灯パターン</div>
     <div class="opts" id="patOpts"></div>
   </div>
-
   <div class="group">
     <div class="lab">LED色</div>
     <div class="opts" id="colorOpts"></div>
+  </div>
+
+  <!-- ステータスLED（丸） -->
+  <div class="sect"><span class="ic"></span>ステータスLED（丸）</div>
+  <div class="group">
+    <div class="lab">点灯パターン</div>
+    <div class="opts" id="sPatOpts"></div>
+  </div>
+  <div class="group">
+    <div class="lab">LED色</div>
+    <div class="opts" id="sColorOpts"></div>
   </div>
   </div>
   </div>
@@ -196,9 +226,10 @@ const COLORS = {
 };
 
 const PATTERNS = {
-  slow:   { name:"ゆっくり点滅", css:"pat-slow",   dot:"d-slow" }, // 呼吸フェード 3.4s
-  steady: { name:"点灯",         css:"pat-steady", dot:""       }, // 常時点灯
-  fast:   { name:"激しく点滅",   css:"pat-fast",   dot:"d-fast" }, // 2Hz 矩形
+  slow:   { name:"ゆっくり点滅", css:"pat-slow",   dot:"d-slow", period:3400 }, // 呼吸フェード 3.4s
+  steady: { name:"点灯",         css:"pat-steady", dot:"",       period:0    }, // 常時点灯
+  fast:   { name:"激しく点滅",   css:"pat-fast",   dot:"d-fast", period:500  }, // 2Hz 矩形
+  off:    { name:"消灯",         css:"pat-off",    dot:"d-off",  period:0    }, // OFF（暗）
 };
 
 const MODES = {
@@ -217,7 +248,7 @@ const SMELL = {
 const ORDER = {
   mode:    ["standby","cook","after"],
   smell:   ["strong","mid","weak"],
-  pattern: ["slow","steady","fast"],
+  pattern: ["slow","steady","fast","off"],
   color:   ["aka","ao","mizu","daidai","momo","shiro","mint"],
 };
 
@@ -227,11 +258,16 @@ const MAX_SAVES = 18;
 /* =====================================================================
  * 状態
  * ===================================================================== */
-const S = { mode:"cook", smell:"strong", pattern:"steady", color:"aka" };
-let saves = [];                 // プリセット配列 {mode, smell, color, pattern}（最大5件）
+const S = {
+  mode:"cook", smell:"strong",       // 条件
+  pattern:"steady", color:"aka",     // 横棒バーLED
+  sPattern:"steady", sColor:"ao",    // ステータスLED（丸）— 独立制御
+};
+let saves = [];                 // プリセット配列（条件＋バー＋ステータス）（最大18件）
 
-const bar     = document.getElementById("bar");
-const readout = document.getElementById("readout");
+const bar       = document.getElementById("bar");
+const statusLed = document.getElementById("statusLed");
+const readout   = document.getElementById("readout");
 
 /* =====================================================================
  * セレクタUIの自動生成（config駆動）
@@ -244,45 +280,79 @@ function makeOpt(value, cls, inner){
   return b;
 }
 
-function buildSelectors(){
-  const modeBox  = document.getElementById("modeOpts");
-  const smellBox = document.getElementById("smellOpts");
-  const patBox   = document.getElementById("patOpts");
-  const colorBox = document.getElementById("colorOpts");
+function buildPatternOpts(box){
+  ORDER.pattern.forEach(k=>{
+    const dotCls = PATTERNS[k].dot ? `pdot ${PATTERNS[k].dot}` : "pdot";
+    box.appendChild(makeOpt(k, "opt pat",
+      `<span class="${dotCls}"></span>${PATTERNS[k].name}`));
+  });
+}
+function buildColorOpts(box){
+  ORDER.color.forEach(k=>
+    box.appendChild(makeOpt(k, "opt color",
+      `<span class="dot" style="background:${COLORS[k].hex}"></span><span class="cn">${COLORS[k].name}</span>`)));
+}
 
+function buildSelectors(){
   ORDER.mode.forEach(k=>
-    modeBox.appendChild(makeOpt(k, "opt",
+    document.getElementById("modeOpts").appendChild(makeOpt(k, "opt",
       `${MODES[k].name}<small>${MODES[k].sub}</small>`)));
 
   ORDER.smell.forEach(k=>
-    smellBox.appendChild(makeOpt(k, "opt", SMELL[k].name)));
+    document.getElementById("smellOpts").appendChild(makeOpt(k, "opt", SMELL[k].name)));
 
-  ORDER.pattern.forEach(k=>{
-    const dotCls = PATTERNS[k].dot ? `pdot ${PATTERNS[k].dot}` : "pdot";
-    patBox.appendChild(makeOpt(k, "opt pat",
-      `<span class="${dotCls}"></span>${PATTERNS[k].name}`));
-  });
+  // 横棒バーLED
+  buildPatternOpts(document.getElementById("patOpts"));
+  buildColorOpts(document.getElementById("colorOpts"));
 
-  ORDER.color.forEach(k=>
-    colorBox.appendChild(makeOpt(k, "opt color",
-      `<span class="dot" style="background:${COLORS[k].hex}"></span><span class="cn">${COLORS[k].name}</span>`)));
+  // ステータスLED（丸）
+  buildPatternOpts(document.getElementById("sPatOpts"));
+  buildColorOpts(document.getElementById("sColorOpts"));
 }
 
 /* =====================================================================
  * 描画
  * ===================================================================== */
-function glow(hex){
-  bar.style.background = hex;
-  bar.style.boxShadow  = `0 0 18px ${hex}, 0 0 40px ${hex}aa, 0 0 80px ${hex}55`;
+const OFF_BG = "#05070a";   // 消灯時の地色
+
+// LED1つを描画（消灯=off に対応）
+function paint(el, baseClass, colorKey, patternKey, big){
+  if(patternKey === "off"){
+    el.style.background = OFF_BG;
+    el.style.boxShadow  = "none";
+    el.className = baseClass + " pat-off";
+  } else {
+    const hex = COLORS[colorKey].hex;
+    el.style.background = hex;
+    el.style.boxShadow  = big
+      ? `0 0 18px ${hex}, 0 0 40px ${hex}aa, 0 0 80px ${hex}55`
+      : `0 0 10px ${hex}, 0 0 22px ${hex}aa, 0 0 44px ${hex}55`;
+    el.className = baseClass + " " + PATTERNS[patternKey].css;
+  }
+  // 点滅の位相を共通タイムライン(epoch0)へアンカー → バーと丸がズレない。
+  // パターンが変わったとき“だけ”設定（色だけ変えても点滅が途切れない）
+  if(patternKey !== el.dataset.pat){
+    const period = PATTERNS[patternKey].period;
+    el.style.animationDelay = period ? `-${(performance.now() % period) / 1000}s` : "0s";
+    el.dataset.pat = patternKey;
+  }
+}
+
+// readout 用の1LED表記（消灯対応）
+function ledDesc(colorKey, patternKey){
+  if(patternKey === "off") return `<b style="color:var(--txt3)">消灯</b>`;
+  return `<b style="color:${COLORS[colorKey].hex}">${COLORS[colorKey].name}</b>・<b>${PATTERNS[patternKey].name}</b>`;
 }
 
 function render(){
-  glow(COLORS[S.color].hex);
-  bar.className = "led-bar " + PATTERNS[S.pattern].css;
+  paint(bar,       "led-bar",    S.color,  S.pattern,  true);
+  paint(statusLed, "status-led", S.sColor, S.sPattern, false);
   readout.innerHTML =
     `<b>${MODES[S.mode].name}</b> ・ <b>${SMELL[S.smell].name}</b>` +
     `<span class="arr">→</span>` +
-    `<b style="color:${COLORS[S.color].hex}">${COLORS[S.color].name}</b> ・ <b>${PATTERNS[S.pattern].name}</b>`;
+    `バー ${ledDesc(S.color, S.pattern)}` +
+    `<span class="arr">／</span>` +
+    `丸 ${ledDesc(S.sColor, S.sPattern)}`;
 }
 
 function setActiveVal(wrapId, val){
@@ -308,14 +378,21 @@ function loadSaves(){
   try{
     const r = localStorage.getItem(LSKEY);
     const parsed = r ? JSON.parse(r) : [];
-    saves = Array.isArray(parsed) ? parsed.slice(0, MAX_SAVES) : [];
+    // 旧プリセット（ステータス未保存）は丸＝バーをミラーして補完
+    saves = (Array.isArray(parsed) ? parsed.slice(0, MAX_SAVES) : []).map(v=>({
+      mode:v.mode, smell:v.smell,
+      color:v.color, pattern:v.pattern,
+      sColor:v.sColor ?? v.color, sPattern:v.sPattern ?? v.pattern,
+    }));
   }catch(e){ saves = []; }
 }
 function persist(){ try{ localStorage.setItem(LSKEY, JSON.stringify(saves)); }catch(e){} }
 
 // 保存行が「いまの設定」と一致するか（ハイライト用）
 const isCurrent = v =>
-  v.mode===S.mode && v.smell===S.smell && v.color===S.color && v.pattern===S.pattern;
+  v.mode===S.mode && v.smell===S.smell &&
+  v.color===S.color && v.pattern===S.pattern &&
+  v.sColor===S.sColor && v.sPattern===S.sPattern;
 
 function updateSaveBtn(){
   const btn  = document.getElementById("saveBtn");
@@ -326,6 +403,10 @@ function updateSaveBtn(){
     : `現在のパターンを保存（${saves.length}/${MAX_SAVES}）`;
 }
 
+// 保存一覧の表示ヘルパー（消灯対応）
+const swColor = (colorKey, patternKey) => patternKey==="off" ? OFF_BG : COLORS[colorKey].hex;
+const txtDesc = (colorKey, patternKey) => patternKey==="off" ? "消灯" : `${COLORS[colorKey].name}・${PATTERNS[patternKey].name}`;
+
 function renderSaves(){
   const list = document.getElementById("saveList");
   if(!saves.length){ list.innerHTML='<div class="save-empty">まだ保存はありません</div>'; return; }
@@ -334,18 +415,23 @@ function renderSaves(){
   saves.forEach((v,i)=>{
     const el=document.createElement("div");
     el.className="save-item"+(isCurrent(v)?" cur":"");
+    const barSw = swColor(v.color, v.pattern), sSw = swColor(v.sColor, v.sPattern);
     el.innerHTML=
-      `<span class="ssw" style="background:${COLORS[v.color].hex};box-shadow:0 0 8px ${COLORS[v.color].hex}"></span>
-       <span class="stxt"><b>${MODES[v.mode].name} × ${SMELL[v.smell].name}</b><small>${COLORS[v.color].name} ・ ${PATTERNS[v.pattern].name}</small></span>
+      `<span class="ssw" style="background:${barSw};box-shadow:0 0 8px ${barSw}"></span>
+       <span class="ssw" style="background:${sSw};box-shadow:0 0 8px ${sSw};border-radius:50%;width:22px;height:22px"></span>
+       <span class="stxt"><b>${MODES[v.mode].name} × ${SMELL[v.smell].name}</b><small>バー ${txtDesc(v.color,v.pattern)} ／ 丸 ${txtDesc(v.sColor,v.sPattern)}</small></span>
        <button class="del">削除</button>`;
     el.onclick = ev=>{
       if(ev.target.classList.contains("del")){
         saves.splice(i,1); persist(); renderSaves(); updateSaveBtn(); return;
       }
-      // 行クリック = その保存（条件＋見せ方）を丸ごと復元
-      S.mode=v.mode; S.smell=v.smell; S.color=v.color; S.pattern=v.pattern;
-      setActiveVal("modeOpts",v.mode);  setActiveVal("smellOpts",v.smell);
+      // 行クリック = その保存（条件＋バー＋ステータス）を丸ごと復元
+      S.mode=v.mode; S.smell=v.smell;
+      S.color=v.color; S.pattern=v.pattern;
+      S.sColor=v.sColor; S.sPattern=v.sPattern;
+      setActiveVal("modeOpts",v.mode);   setActiveVal("smellOpts",v.smell);
       setActiveVal("colorOpts",v.color); setActiveVal("patOpts",v.pattern);
+      setActiveVal("sColorOpts",v.sColor); setActiveVal("sPatOpts",v.sPattern);
       render(); renderSaves();
     };
     list.appendChild(el);
@@ -354,7 +440,11 @@ function renderSaves(){
 
 document.getElementById("saveBtn").onclick = ()=>{
   if(saves.length >= MAX_SAVES) return;            // 上限ガード
-  saves.push({ mode:S.mode, smell:S.smell, color:S.color, pattern:S.pattern });
+  saves.push({
+    mode:S.mode, smell:S.smell,
+    color:S.color, pattern:S.pattern,
+    sColor:S.sColor, sPattern:S.sPattern,
+  });
   persist(); renderSaves(); updateSaveBtn();
 };
 
@@ -366,11 +456,15 @@ bind("modeOpts","mode");
 bind("smellOpts","smell");
 bind("patOpts","pattern");
 bind("colorOpts","color");
+bind("sPatOpts","sPattern");
+bind("sColorOpts","sColor");
 
-setActiveVal("modeOpts",  S.mode);
-setActiveVal("smellOpts", S.smell);
-setActiveVal("patOpts",   S.pattern);
-setActiveVal("colorOpts", S.color);
+setActiveVal("modeOpts",   S.mode);
+setActiveVal("smellOpts",  S.smell);
+setActiveVal("patOpts",    S.pattern);
+setActiveVal("colorOpts",  S.color);
+setActiveVal("sPatOpts",   S.sPattern);
+setActiveVal("sColorOpts", S.sColor);
 
 loadSaves();
 updateSaveBtn();
