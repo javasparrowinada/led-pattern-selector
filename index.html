@@ -23,6 +23,9 @@
   --c-momo:#ff74ad;
   --c-shiro:#ffffff;
   --c-mint:#4ff0c4;
+  --c-ki:#ffe14d;
+  --c-midori:#2ee06a;
+  --c-murasaki:#b06bff;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{
@@ -103,10 +106,15 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
   display:flex;align-items:center;gap:8px}
 .sect .ic{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
 
-/* color swatch opts */
-.opt.color{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0;flex:1}
-.opt.color .dot{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.2)}
-.opt.color .cn{font-size:12px}
+/* color swatch opts — コンパクト（丸スウォッチのみ・ラベルはホバー表示） */
+.opt.color{flex:0 0 auto;min-width:0;width:30px;height:30px;padding:0;border:0;
+  border-radius:50%;background:transparent}
+.opt.color .dot{display:block;width:30px;height:30px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);transition:transform .12s,box-shadow .12s}
+.opt.color:hover{border:0}
+.opt.color:hover .dot{transform:scale(1.1)}
+.opt.color.active{background:transparent;box-shadow:none}
+.opt.color.active .dot{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent),0 0 10px rgba(77,163,255,.45)}
 
 /* pattern preview dot */
 .opt.pat{display:flex;align-items:center;justify-content:center;gap:8px}
@@ -216,13 +224,16 @@ header p{color:var(--txt3);font-size:12.5px;margin-top:5px}
  * 仕様の正本: LEDパターン仕様_実装ハンドオフ_v1.yaml（2〜5章）
  * ===================================================================== */
 const COLORS = {
-  aka:    { name:"赤",       hex:"#ff2a2a" },
-  ao:     { name:"青",       hex:"#1456ff" },
-  mizu:   { name:"水色",     hex:"#5cc8ff" },
-  daidai: { name:"オレンジ", hex:"#ff8a14" },
-  momo:   { name:"桃色",     hex:"#ff74ad" },
-  shiro:  { name:"白",       hex:"#ffffff" },
-  mint:   { name:"ミント",   hex:"#4ff0c4" }, // 添付カメラLED由来
+  aka:     { name:"赤",       hex:"#ff2a2a" },
+  ao:      { name:"青",       hex:"#1456ff" },
+  mizu:    { name:"水色",     hex:"#5cc8ff" },
+  daidai:  { name:"オレンジ", hex:"#ff8a14" },
+  momo:    { name:"桃色",     hex:"#ff74ad" },
+  shiro:   { name:"白",       hex:"#ffffff" },
+  mint:    { name:"ミント",   hex:"#4ff0c4" }, // 添付カメラLED由来
+  ki:      { name:"黄",       hex:"#ffe14d" },
+  midori:  { name:"緑",       hex:"#2ee06a" },
+  murasaki:{ name:"紫",       hex:"#b06bff" },
 };
 
 const PATTERNS = {
@@ -249,7 +260,7 @@ const ORDER = {
   mode:    ["standby","cook","after"],
   smell:   ["strong","mid","weak"],
   pattern: ["slow","steady","fast","off"],
-  color:   ["aka","ao","mizu","daidai","momo","shiro","mint"],
+  color:   ["aka","daidai","ki","midori","mint","mizu","ao","murasaki","momo","shiro"],
 };
 
 const LSKEY = "led_presets_v1";
@@ -288,9 +299,12 @@ function buildPatternOpts(box){
   });
 }
 function buildColorOpts(box){
-  ORDER.color.forEach(k=>
-    box.appendChild(makeOpt(k, "opt color",
-      `<span class="dot" style="background:${COLORS[k].hex}"></span><span class="cn">${COLORS[k].name}</span>`)));
+  ORDER.color.forEach(k=>{
+    const b = makeOpt(k, "opt color",
+      `<span class="dot" style="background:${COLORS[k].hex}"></span>`);
+    b.title = COLORS[k].name;   // ラベルはホバーで表示
+    box.appendChild(b);
+  });
 }
 
 function buildSelectors(){
